@@ -20,6 +20,10 @@ export interface CallOptions {
   address: string;
 }
 
+export interface MuteOption {
+  muted: boolean
+}
+
 /**
  * Defines the public API for the SipLinphone plugin.
  */
@@ -55,6 +59,13 @@ export interface SipLinphonePlugin {
    * @returns {Promise<void>} A promise that resolves when the call is terminated.
    */
   hangUp(): Promise<void>;
+
+  /**
+   * Allows toggling of the microphone.
+   * @param mute - the mute data
+   * @returns {Promise<void>} A promise that resolves when the call is terminated.
+   */
+  setMute(mute: MuteOption): Promise<void>;
 
   /**
    * Listens for changes in the call state.

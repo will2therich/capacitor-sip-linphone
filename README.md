@@ -18,6 +18,7 @@ npx cap sync
 * [`unregister()`](#unregister)
 * [`makeCall(...)`](#makecall)
 * [`hangUp()`](#hangup)
+* [`setMute(...)`](#setmute)
 * [`addListener('callStateChanged', ...)`](#addlistenercallstatechanged-)
 * [Interfaces](#interfaces)
 
@@ -91,6 +92,21 @@ Hangs up the current call.
 --------------------
 
 
+### setMute(...)
+
+```typescript
+setMute(mute: MuteOption) => Promise<void>
+```
+
+Allows toggling of the microphone.
+
+| Param      | Type                                              | Description     |
+| ---------- | ------------------------------------------------- | --------------- |
+| **`mute`** | <code><a href="#muteoption">MuteOption</a></code> | - the mute data |
+
+--------------------
+
+
 ### addListener('callStateChanged', ...)
 
 ```typescript
@@ -130,6 +146,13 @@ An interface for call options.
 | Prop          | Type                | Description                                            |
 | ------------- | ------------------- | ------------------------------------------------------ |
 | **`address`** | <code>string</code> | The SIP address to call (e.g., "sip:user@domain.com"). |
+
+
+#### MuteOption
+
+| Prop        | Type                 |
+| ----------- | -------------------- |
+| **`muted`** | <code>boolean</code> |
 
 
 #### PluginListenerHandle
