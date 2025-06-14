@@ -181,6 +181,45 @@ public class SipLinphonePlugin extends Plugin {
         }
     }
 
+    @PluginMethod
+    public void setMute(PluginCall call) {
+        boolean mute = call.getBoolean("mute", false);
+        if (linphoneCore != null) {
+            linphoneCore.setMicEnabled(!mute);
+            call.resolve();
+        } else {
+            call.reject("Linphone Core not initialized.");
+        }
+    }
+
+    @PluginMethod
+    public void setSpeaker(PluginCall call) {
+        boolean speakerOn = call.getBoolean("speaker", false);
+        if (linphoneCore != null) {
+            AudioDevice speaker = null;
+            AudioDevice earpiece = null;
+
+            for (AudioDevice device : linphoneCore.getAudioDevices()) {
+                if (device.getType() == AudioDevice.Type.Speaker) {
+                    speaker = device;
+                } else if (device.getType() == AudioDevice.Type.Earpiece) {
+                    earpiece = device;
+                }
+            }
+
+            if (speakerOn && speaker != null) {
+                linphoneCore.setOutputAudioDevice(speaker);
+            } else if (!speakerOn && earpiece != null) {
+                linphoneCore.setOutputAudioDevice(earpiece);
+            }
+
+            call.resolve();
+        } else {
+            call.reject("Linphone Core not initialized.");
+        }
+    }
+
+
     @Override
     protected void handleOnDestroy() {
         try {
