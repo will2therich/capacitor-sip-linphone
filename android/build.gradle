@@ -9,6 +9,9 @@ buildscript {
     repositories {
         google()
         mavenCentral()
+        maven {
+            url "https://linphone.org/maven_repository"
+        }
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:8.7.2'
@@ -45,6 +48,9 @@ android {
 repositories {
     google()
     mavenCentral()
+    maven {
+        url "https://linphone.org/maven_repository"
+    }
 }
 
 
@@ -55,4 +61,10 @@ dependencies {
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+
+    // Latest version is 6.0.x, using + to get the latest available
+    implementation 'org.linphone:linphone-sdk-android:5.4.22'
+
+    // Adding this dependency allows the linphone-sdk to automatically handle audio focus
+    implementation 'androidx.media:media:1.6.0'
 }

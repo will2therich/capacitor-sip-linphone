@@ -1,2 +1,22 @@
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+        maven {
+            name = "linphone.org maven repository"
+            url = uri("https://download.linphone.org/maven_repository")
+            content {
+                includeGroup("org.linphone")
+            }
+        }
+    }
+}
+
+rootProject.name = 'android'
+include ':app'
 include ':capacitor-android'
-project(':capacitor-android').projectDir = new File('../node_modules/@capacitor/android/capacitor')
+include ':capacitor-sip-linphone' // This line should already be here from `cap sync`
+project(':capacitor-android').projectDir = new File(rootProject.projectDir, '../node_modules/@capacitor/android/capacitor')
+project(':capacitor-sip-linphone').projectDir = new File(rootProject.projectDir, '../node_modules/capacitor-sip-linphone/android')
+

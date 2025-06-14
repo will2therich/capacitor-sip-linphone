@@ -13,25 +13,129 @@ npx cap sync
 
 <docgen-index>
 
-* [`echo(...)`](#echo)
+* [`initialize()`](#initialize)
+* [`register(...)`](#register)
+* [`unregister()`](#unregister)
+* [`makeCall(...)`](#makecall)
+* [`hangUp()`](#hangup)
+* [`addListener('callStateChanged', ...)`](#addlistenercallstatechanged-)
+* [Interfaces](#interfaces)
 
 </docgen-index>
 
 <docgen-api>
 <!--Update the source file JSDoc comments and rerun docgen to update the docs below-->
 
-### echo(...)
+Defines the public API for the SipLinphone plugin.
+
+### initialize()
 
 ```typescript
-echo(options: { value: string; }) => Promise<{ value: string; }>
+initialize() => Promise<void>
 ```
 
-| Param         | Type                            |
-| ------------- | ------------------------------- |
-| **`options`** | <code>{ value: string; }</code> |
-
-**Returns:** <code>Promise&lt;{ value: string; }&gt;</code>
+Initializes the Linphone core. This must be called before any other method.
 
 --------------------
+
+
+### register(...)
+
+```typescript
+register(options: RegisterOptions) => Promise<void>
+```
+
+Registers the user agent with the SIP server.
+
+| Param         | Type                                                        | Description                 |
+| ------------- | ----------------------------------------------------------- | --------------------------- |
+| **`options`** | <code><a href="#registeroptions">RegisterOptions</a></code> | - The registration options. |
+
+--------------------
+
+
+### unregister()
+
+```typescript
+unregister() => Promise<void>
+```
+
+Unregisters the user agent from the SIP server.
+
+--------------------
+
+
+### makeCall(...)
+
+```typescript
+makeCall(options: CallOptions) => Promise<void>
+```
+
+Makes an outgoing call.
+
+| Param         | Type                                                | Description         |
+| ------------- | --------------------------------------------------- | ------------------- |
+| **`options`** | <code><a href="#calloptions">CallOptions</a></code> | - The call options. |
+
+--------------------
+
+
+### hangUp()
+
+```typescript
+hangUp() => Promise<void>
+```
+
+Hangs up the current call.
+
+--------------------
+
+
+### addListener('callStateChanged', ...)
+
+```typescript
+addListener(eventName: 'callStateChanged', callback: (data: { state: string; }) => void) => Promise<PluginListenerHandle>
+```
+
+Listens for changes in the call state.
+
+| Param           | Type                                               | Description                                                 |
+| --------------- | -------------------------------------------------- | ----------------------------------------------------------- |
+| **`eventName`** | <code>'callStateChanged'</code>                    | - The name of the event to listen for ('callStateChanged'). |
+| **`callback`**  | <code>(data: { state: string; }) =&gt; void</code> | - The function to execute when the event occurs.            |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### Interfaces
+
+
+#### RegisterOptions
+
+An interface defining the options for registering with a SIP server.
+
+| Prop           | Type                | Description                    |
+| -------------- | ------------------- | ------------------------------ |
+| **`username`** | <code>string</code> | The SIP username.              |
+| **`password`** | <code>string</code> | The SIP user's password.       |
+| **`domain`**   | <code>string</code> | The SIP domain/server address. |
+
+
+#### CallOptions
+
+An interface for call options.
+
+| Prop          | Type                | Description                                            |
+| ------------- | ------------------- | ------------------------------------------------------ |
+| **`address`** | <code>string</code> | The SIP address to call (e.g., "sip:user@domain.com"). |
+
+
+#### PluginListenerHandle
+
+| Prop         | Type                                      |
+| ------------ | ----------------------------------------- |
+| **`remove`** | <code>() =&gt; Promise&lt;void&gt;</code> |
 
 </docgen-api>
