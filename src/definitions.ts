@@ -65,6 +65,18 @@ export interface SipLinphonePlugin {
   hangUp(): Promise<void>;
 
   /**
+   * Accepts an incoming call.
+   * @returns {Promise<void>} A promise that resolves when the call is terminated.
+   */
+  acceptCall(): Promise<void>;
+
+  /**
+   * Declines an incoming call.
+   * @returns {Promise<void>} A promise that resolves when the call is terminated.
+   */
+  declineCall(): Promise<void>;
+
+  /**
    * Allows toggling of the microphone.
    * @param options - options
    * @returns {Promise<void>} A promise that resolves when the call is terminated.
@@ -79,7 +91,7 @@ export interface SipLinphonePlugin {
   setSpeaker(options: SpeakerOption): Promise<void>;
 
   /**
-   * Listens for changes in the call state.
+   * Listens for changes in the call state. gives SIP events, incoming & outgoing call updates
    *
    * @param eventName - The name of the event to listen for ('callStateChanged').
    * @param callback - The function to execute when the event occurs.

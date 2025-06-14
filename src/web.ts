@@ -19,6 +19,14 @@ export class SipLinphoneWeb extends WebPlugin implements SipLinphonePlugin {
     throw this.unavailable('SIP functionality is not available on the web.');
   }
 
+  async acceptCall(): Promise<void> {
+    throw this.unavailable('SIP functionality is not available on the web.');
+  }
+
+  async declineCall(): Promise<void> {
+    throw this.unavailable('SIP functionality is not available on the web.');
+  }
+
   async makeCall(_options: CallOptions): Promise<void> {
     throw this.unavailable('SIP functionality is not available on the web.');
   }

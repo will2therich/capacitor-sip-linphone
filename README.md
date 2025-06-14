@@ -18,6 +18,8 @@ npx cap sync
 * [`unregister()`](#unregister)
 * [`makeCall(...)`](#makecall)
 * [`hangUp()`](#hangup)
+* [`acceptCall()`](#acceptcall)
+* [`declineCall()`](#declinecall)
 * [`setMute(...)`](#setmute)
 * [`setSpeaker(...)`](#setspeaker)
 * [`addListener('callStateChanged', ...)`](#addlistenercallstatechanged-)
@@ -93,6 +95,28 @@ Hangs up the current call.
 --------------------
 
 
+### acceptCall()
+
+```typescript
+acceptCall() => Promise<void>
+```
+
+Accepts an incoming call.
+
+--------------------
+
+
+### declineCall()
+
+```typescript
+declineCall() => Promise<void>
+```
+
+Declines an incoming call.
+
+--------------------
+
+
 ### setMute(...)
 
 ```typescript
@@ -129,7 +153,7 @@ Allows toggling of the speaker.
 addListener(eventName: 'callStateChanged', callback: (data: { state: string; }) => void) => Promise<PluginListenerHandle>
 ```
 
-Listens for changes in the call state.
+Listens for changes in the call state. gives SIP events, incoming & outgoing call updates
 
 | Param           | Type                                               | Description                                                 |
 | --------------- | -------------------------------------------------- | ----------------------------------------------------------- |

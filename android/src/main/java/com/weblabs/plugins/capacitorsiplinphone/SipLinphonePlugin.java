@@ -219,6 +219,28 @@ public class SipLinphonePlugin extends Plugin {
         }
     }
 
+    @PluginMethod
+    public void acceptCall(PluginCall call) {
+        Call incoming = linphoneCore.getCurrentCall();
+        if (incoming != null && incoming.getState() == Call.State.IncomingReceived) {
+            CallParams params = linphoneCore.createCallParams(incoming);
+            incoming.acceptWithParams(params);
+            call.resolve();
+        } else {
+            call.reject("No incoming call to accept.");
+        }
+    }
+
+    @PluginMethod
+    public void declineCall(PluginCall call) {
+        Call incoming = linphoneCore.getCurrentCall();
+        if (incoming != null && incoming.getState() == Call.State.IncomingReceived) {
+            incoming.terminate();
+            call.resolve();
+        } else {
+            call.reject("No incoming call to decline.");
+        }
+    }
 
     @Override
     protected void handleOnDestroy() {
@@ -237,6 +259,8 @@ public class SipLinphonePlugin extends Plugin {
         }
         super.handleOnDestroy();
     }
+
+
 
     public void emitEvent(String name, JSObject data) {
         notifyListeners(name, data, true);
