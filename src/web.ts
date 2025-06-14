@@ -1,6 +1,6 @@
 import { WebPlugin } from '@capacitor/core';
 
-import type { SipLinphonePlugin, RegisterOptions, CallOptions, MuteOption } from './definitions';
+import type { SipLinphonePlugin, RegisterOptions, CallOptions, MuteOption, SpeakerOption } from './definitions';
 
 export class SipLinphoneWeb extends WebPlugin implements SipLinphonePlugin {
   constructor() {
@@ -23,7 +23,11 @@ export class SipLinphoneWeb extends WebPlugin implements SipLinphonePlugin {
     throw this.unavailable('SIP functionality is not available on the web.');
   }
 
-  async setMute(_mute: MuteOption): Promise<void> {
+  async setMute(_options: MuteOption): Promise<void> {
+    throw this.unavailable('SIP functionality is not available on the web.');
+  }
+
+  async setSpeaker(_options: SpeakerOption): Promise<void> {
     throw this.unavailable('SIP functionality is not available on the web.');
   }
 

@@ -19,6 +19,7 @@ npx cap sync
 * [`makeCall(...)`](#makecall)
 * [`hangUp()`](#hangup)
 * [`setMute(...)`](#setmute)
+* [`setSpeaker(...)`](#setspeaker)
 * [`addListener('callStateChanged', ...)`](#addlistenercallstatechanged-)
 * [Interfaces](#interfaces)
 
@@ -95,14 +96,29 @@ Hangs up the current call.
 ### setMute(...)
 
 ```typescript
-setMute(mute: MuteOption) => Promise<void>
+setMute(options: MuteOption) => Promise<void>
 ```
 
 Allows toggling of the microphone.
 
-| Param      | Type                                              | Description     |
-| ---------- | ------------------------------------------------- | --------------- |
-| **`mute`** | <code><a href="#muteoption">MuteOption</a></code> | - the mute data |
+| Param         | Type                                              | Description |
+| ------------- | ------------------------------------------------- | ----------- |
+| **`options`** | <code><a href="#muteoption">MuteOption</a></code> | - options   |
+
+--------------------
+
+
+### setSpeaker(...)
+
+```typescript
+setSpeaker(options: SpeakerOption) => Promise<void>
+```
+
+Allows toggling of the speaker.
+
+| Param         | Type                                                    | Description     |
+| ------------- | ------------------------------------------------------- | --------------- |
+| **`options`** | <code><a href="#speakeroption">SpeakerOption</a></code> | - the mute data |
 
 --------------------
 
@@ -150,9 +166,16 @@ An interface for call options.
 
 #### MuteOption
 
-| Prop        | Type                 |
-| ----------- | -------------------- |
-| **`muted`** | <code>boolean</code> |
+| Prop       | Type                 |
+| ---------- | -------------------- |
+| **`mute`** | <code>boolean</code> |
+
+
+#### SpeakerOption
+
+| Prop          | Type                 |
+| ------------- | -------------------- |
+| **`speaker`** | <code>boolean</code> |
 
 
 #### PluginListenerHandle

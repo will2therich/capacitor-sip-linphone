@@ -21,7 +21,11 @@ export interface CallOptions {
 }
 
 export interface MuteOption {
-  muted: boolean
+  mute: boolean
+}
+
+export interface SpeakerOption {
+  speaker: boolean
 }
 
 /**
@@ -62,10 +66,17 @@ export interface SipLinphonePlugin {
 
   /**
    * Allows toggling of the microphone.
-   * @param mute - the mute data
+   * @param options - options
    * @returns {Promise<void>} A promise that resolves when the call is terminated.
    */
-  setMute(mute: MuteOption): Promise<void>;
+  setMute(options: MuteOption): Promise<void>;
+
+  /**
+   * Allows toggling of the speaker.
+   * @param options - the mute data
+   * @returns {Promise<void>} A promise that resolves when the call is terminated.
+   */
+  setSpeaker(options: SpeakerOption): Promise<void>;
 
   /**
    * Listens for changes in the call state.
