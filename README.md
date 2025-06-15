@@ -15,6 +15,7 @@ npx cap sync
 
 * [`initialize()`](#initialize)
 * [`register(...)`](#register)
+* [`getRegistrationStatus()`](#getregistrationstatus)
 * [`unregister()`](#unregister)
 * [`makeCall(...)`](#makecall)
 * [`hangUp()`](#hangup)
@@ -54,6 +55,17 @@ Registers the user agent with the SIP server.
 | Param         | Type                                                        | Description                 |
 | ------------- | ----------------------------------------------------------- | --------------------------- |
 | **`options`** | <code><a href="#registeroptions">RegisterOptions</a></code> | - The registration options. |
+
+--------------------
+
+
+### getRegistrationStatus()
+
+```typescript
+getRegistrationStatus() => Promise<void>
+```
+
+Checks the registration status.
 
 --------------------
 

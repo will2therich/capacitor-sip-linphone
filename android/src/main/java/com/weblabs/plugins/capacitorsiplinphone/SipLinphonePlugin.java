@@ -20,6 +20,14 @@ import org.linphone.core.AuthInfo;
 import org.linphone.core.Core;
 import org.linphone.core.CoreListener;
 
+import android.net.wifi.WifiManager;
+import android.net.wifi.WifiInfo;
+import android.location.LocationManager;
+import android.content.Context;
+import android.Manifest;
+import androidx.core.app.ActivityCompat;
+import android.content.pm.PackageManager;
+
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -55,8 +63,6 @@ public class SipLinphonePlugin extends Plugin {
             linphoneCore.setUseRfc2833ForDtmf(true);
             linphoneCore.setPlaybackGainDb(1.0f);
             linphoneCore.setMicGainDb(1.0f);
-
-            AudioDevice current = linphoneCore.getOutputAudioDevice();
 
             // Fully implement the CoreListener interface with all required methods
             linphoneListener = new CoreListenerImpl(this);
@@ -246,6 +252,32 @@ public class SipLinphonePlugin extends Plugin {
             call.resolve(result);
         } else {
             call.reject("Linphone not initialized or no default account.");
+        }
+    }
+
+    @PluginMethod
+    public void getCurrentBssid(PluginCall call) {
+        if (ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(getActivity(), new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 5678);
+            call.reject("Location permission not granted.");
+            return;
+        }
+
+        try {
+            WifiManager wifiManager = (WifiManager) getContext().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            if (wifiManager != null) {
+                WifiInfo wifiInfo = wifiManager.getConnectionInfo();
+                String bssid = wifiInfo.getBSSID();
+
+                JSObject result = new JSObject();
+                result.put("bssid", bssid != null ? bssid : "Unavailable");
+                call.resolve(result);
+            } else {
+                call.reject("Could not access WiFiManager");
+            }
+        } catch (Exception e) {
+            call.reject("Failed to retrieve BSSID: " + e.getMessage());
         }
     }
 
