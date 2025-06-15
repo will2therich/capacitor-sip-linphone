@@ -26,7 +26,8 @@ public class CoreListenerImpl implements CoreListener {
     @Override
     public void onCallStateChanged(Core core, Call call, Call.State state, String message) {
         JSObject ret = new JSObject();
-        ret.put("state", state.toString());
+        ret.put("state", "Call");
+        ret.put("status", state.toString());
         ret.put("message", message != null ? message : "");
 
         if (state == Call.State.IncomingReceived) {
