@@ -45,6 +45,13 @@ export interface SipLinphonePlugin {
    */
   register(options: RegisterOptions): Promise<void>;
 
+
+  /**
+   * Checks the registration status.
+   * @returns {Promise<void>} A promise that resolves when the call is terminated.
+   */
+  getRegistrationStatus(): Promise<void>;
+
   /**
    * Unregisters the user agent from the SIP server.
    * @returns {Promise<void>} A promise that resolves when unregistered.

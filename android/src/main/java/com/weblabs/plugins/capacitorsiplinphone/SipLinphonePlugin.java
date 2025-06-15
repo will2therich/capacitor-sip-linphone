@@ -4,9 +4,6 @@ import android.content.pm.PackageManager;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import android.Manifest;
-import android.util.Log;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -60,8 +57,6 @@ public class SipLinphonePlugin extends Plugin {
             linphoneCore.setMicGainDb(1.0f);
 
             AudioDevice current = linphoneCore.getOutputAudioDevice();
-
-            Log.d("AUDIO", "Playback Device: " + (current != null ? current.getType() : "none"));
 
             // Fully implement the CoreListener interface with all required methods
             linphoneListener = new CoreListenerImpl(this);
@@ -241,6 +236,19 @@ public class SipLinphonePlugin extends Plugin {
             call.reject("No incoming call to decline.");
         }
     }
+
+    @PluginMethod
+    public void getRegistrationStatus(PluginCall call) {
+        if (linphoneCore != null && linphoneCore.getDefaultAccount() != null) {
+            RegistrationState state = linphoneCore.getDefaultAccount().getState();
+            JSObject result = new JSObject();
+            result.put("state", state.toString());
+            call.resolve(result);
+        } else {
+            call.reject("Linphone not initialized or no default account.");
+        }
+    }
+
 
     @Override
     protected void handleOnDestroy() {
