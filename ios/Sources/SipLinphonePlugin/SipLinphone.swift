@@ -7,27 +7,47 @@ import linphonesw
 
 @objc(SipLinphone)
 public class SipLinphone: CAPPlugin {
-    private var call: String? // Placeholder for future Linphone call object
+    // Keep a reference to the active or incoming Linphone call object
+    private var currentCall: Call?
     private var locationManager: CLLocationManager?
     private var bssidCall: CAPPluginCall?
     private var linphoneCore: Core? = nil
     private var coreTimer: Timer?
     
+    // MARK: - Plugin Lifecycle
+    
+    public override func load() {
+        // This is a good place to add setup that needs to happen once.
+        // For microphone permissions, ensure "Privacy - Microphone Usage Description"
+        // is set in your app's Info.plist.
+    }
+    
+    deinit {
+        coreTimer?.invalidate()
+        linphoneCore?.removeDelegate(delegate: self)
+        linphoneCore?.stop()
+    }
+
+    // MARK: - Core and Registration
+    
     @objc func initialize(_ call: CAPPluginCall) {
         do {
+            
             linphoneCore = try Factory.Instance.createCore(configPath: nil, factoryConfigPath: nil, systemContext: nil)
             
-            // Add 'try' to acknowledge that start() can fail
+            // Add the delegate to listen for core events
+            linphoneCore?.addDelegate(delegate: self)
+            
+            // Start the core
             try linphoneCore?.start()
             
-            // Start iteration timer
+            // Start iteration timer to process events
             coreTimer = Timer.scheduledTimer(withTimeInterval: 0.02, repeats: true) { [weak self] _ in
                 self?.linphoneCore?.iterate()
             }
             
             call.resolve()
         } catch {
-            // This block now catches errors from both createCore() and start()
             call.reject("Failed to initialize Linphone Core: \(error.localizedDescription)")
         }
     }
@@ -42,94 +62,148 @@ public class SipLinphone: CAPPlugin {
         }
         
         do {
-            // AuthInfo creation is correct
             let authInfo = try Factory.Instance.createAuthInfo(username: username, userid: nil, passwd: password, ha1: nil, realm: nil, domain: domain)
             core.addAuthInfo(info: authInfo)
             
-            // AccountParams creation is correct
             let accountParams = try core.createAccountParams()
             
-            // --- THIS IS THE CORRECTED SECTION ---
-            
-            // 1. Create the identity address using 'try'
             let identityStr = "sip:\(username)@\(domain)"
             let identityAddr = try Factory.Instance.createAddress(addr: identityStr)
-            
-            // 2. Assign the identity Address object
             try accountParams.setIdentityaddress(newValue: identityAddr)
             
-            // 3. Create the server address using 'try'
             let proxyStr = "sip:\(domain)"
             let proxyAddr = try Factory.Instance.createAddress(addr: proxyStr)
-            
-            // 4. Assign the server address
             try accountParams.setServeraddress(newValue: proxyAddr)
             
-            // 5. Enable registration
             accountParams.registerEnabled = true
             
-            
-            // Account creation and adding it to the core remains the same
             let account = try core.createAccount(params: accountParams)
             try core.addAccount(account: account)
             core.defaultAccount = account
-            
+        
             call.resolve(["status": "Registration in progress..."])
         } catch {
-            // This single catch block now handles potential errors from:
-            // - createAuthInfo
-            // - createAccountParams
-            // - createAddress (for both identity and proxy)
-            // - createAccount
             call.reject("Registration error: \(error.localizedDescription)")
         }
     }
     
-  @objc func makeCall(_ call: CAPPluginCall) {
-    guard let address = call.getString("address") else {
-      call.reject("Missing address")
-      return
+    @objc func unregister(_ call: CAPPluginCall) {
+        guard let core = linphoneCore else {
+            call.reject("Core not initialized")
+            return
+        }
+        
+        core.clearAccounts()
+        core.clearAllAuthInfo()
+        
+        call.resolve()
+    }
+    
+    @objc func getRegistrationStatus(_ call: CAPPluginCall) {
+        guard let core = linphoneCore, let account = core.defaultAccount else {
+            call.reject("Core not initialized or no default account")
+            return
+        }
+        
+        let stateStr = "\(account.state)"
+        call.resolve(["state": stateStr.capitalized])
+    }
+    
+    // MARK: - Call Management
+
+    @objc func makeCall(_ call: CAPPluginCall) {
+        guard let address = call.getString("address"), let core = linphoneCore else {
+            call.reject("Missing address or core not initialized")
+            return
+        }
+
+        self.currentCall = core.invite(url: address)
+        call.resolve()
+    
+    }
+    
+    @objc func terminateCall(_ call: CAPPluginCall) {
+        do {
+            if let currentCall = self.currentCall {
+                
+                // If we have a specific call, terminate it
+                try currentCall.terminate()
+                self.currentCall = nil
+            } else {
+                // Otherwise, terminate all calls as a fallback
+                try linphoneCore?.terminateAllCalls()
+            }
+            call.resolve()
+        } catch {
+            call.reject("Failed to terminate call: \(error.localizedDescription)")
+        }
     }
 
-    // TODO: Initiate outgoing call to address
+    @objc func acceptCall(_ call: CAPPluginCall) {
+        guard let incomingCall = self.currentCall, incomingCall.state == .IncomingReceived else {
+            call.reject("No incoming call to accept")
+            return
+        }
 
-    call.resolve()
-  }
+        do {
+            try incomingCall.accept()
+            call.resolve()
+        } catch {
+            call.reject("Failed to accept call: \(error.localizedDescription)")
+        }
+    }
 
-  @objc func terminateCall(_ call: CAPPluginCall) {
-    // TODO: Terminate current call
+    @objc func declineCall(_ call: CAPPluginCall) {
+        guard let incomingCall = self.currentCall, incomingCall.state == .IncomingReceived else {
+            call.reject("No incoming call to decline")
+            return
+        }
+        
+        do {
+            try incomingCall.decline(reason: Reason.Declined)
+            self.currentCall = nil
+            call.resolve()
+        } catch {
+            call.reject("Failed to decline call: \(error.localizedDescription)")
+        }
+    }
+    
+    // MARK: - In-Call Actions
 
-    call.resolve()
-  }
+    @objc func setMute(_ call: CAPPluginCall) {
+        let mute = call.getBool("mute") ?? false
+        linphoneCore?.micEnabled = !mute
+        call.resolve()
+    }
 
-  @objc func setMute(_ call: CAPPluginCall) {
-    let mute = call.getBool("mute") ?? false
-    // TODO: Toggle mic mute state
-    call.resolve()
-  }
+    @objc func setSpeaker(_ call: CAPPluginCall) {
+        let speakerOn = call.getBool("speaker") ?? false
+        
+        guard let core = self.linphoneCore else {
+            call.reject("Linphone core not initialized")
+            return
+        }
 
-  @objc func setSpeaker(_ call: CAPPluginCall) {
-    let speaker = call.getBool("speaker") ?? false
-    // TODO: Toggle audio output to speaker/earpiece
-    call.resolve()
-  }
+        // Find the available speaker and earpiece audio devices
+        let speakerDevice = core.audioDevices.first { $0.type == .Speaker }
+        let earpieceDevice = core.audioDevices.first { $0.type == .Earpiece }
 
-  @objc func acceptCall(_ call: CAPPluginCall) {
-    // TODO: Accept incoming call
-    call.resolve()
-  }
-
-  @objc func declineCall(_ call: CAPPluginCall) {
-    // TODO: Decline incoming call
-    call.resolve()
-  }
-
-  @objc func getRegistrationStatus(_ call: CAPPluginCall) {
-    // TODO: Return registration state
-    let result = ["state": "Unknown"]
-    call.resolve(result)
-  }
-
+        if speakerOn {
+            // If speaker mode is requested, set the output device to speaker
+            if let speaker = speakerDevice {
+                core.outputAudioDevice = speaker
+            }
+        } else {
+            // Otherwise, set it back to the earpiece
+            if let earpiece = earpieceDevice {
+                core.outputAudioDevice = earpiece
+            }
+        }
+        
+        call.resolve()
+    }
+    
+    // MARK: - Network Information
 
     @objc func getCurrentBssid(_ call: CAPPluginCall) {
         locationManager = CLLocationManager()
@@ -149,30 +223,7 @@ public class SipLinphone: CAPPlugin {
             call.reject("Location permission not granted")
         }
     }
-
-}
-
-extension SipLinphone: CLLocationManagerDelegate {
-    public func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        guard let call = bssidCall else { return }
-
-        let status = manager.authorizationStatus
-
-        if status == .authorizedWhenInUse || status == .authorizedAlways {
-            self.fetchBssid { bssid in
-                call.resolve(["bssid": bssid ?? "d8:ec:5e:d5:cb:56"])
-                self.bssidCall = nil
-                self.locationManager = nil
-            }
-        } else {
-            call.resolve(["bssid": "d8:ec:5e:d5:cb:56"]) // mock fallback
-            self.bssidCall = nil
-            self.locationManager = nil
-        }
-    }
-
-
-
+    
     private func fetchBssid(completion: @escaping (String?) -> Void) {
         NEHotspotNetwork.fetchCurrent { network in
             if let bssid = network?.bssid {
@@ -184,7 +235,58 @@ extension SipLinphone: CLLocationManagerDelegate {
             }
         }
     }
-
-
 }
 
+// MARK: - CoreDelegate
+
+extension SipLinphone: CoreDelegate {
+    public func onAccountRegistrationStateChanged(core: Core, account: Account, state: RegistrationState, message: String) {
+        let stateStr = "\(state)".capitalized
+        
+        print("✅ [SIP-PLUGIN] Registration State Changed: \(stateStr) - \(message)")
+        
+        // Send a "state" field along with the "status"
+        self.notifyListeners("registrationStateChanged", data: ["status": stateStr, "state": "Registration"])
+    }
+    
+    public func onCallStateChanged(core: Core, call: Call, state: Call.State, message: String) {
+        var callStateStr = "\(state)".capitalized
+        
+        switch state {
+        case .IncomingReceived:
+            self.currentCall = call // Store the incoming call object
+            self.notifyListeners("incomingCall", data: ["callId": "123", "status": callStateStr])
+        case .Connected:
+            self.notifyListeners("callStateChanged", data: ["status": callStateStr, "state": "Call"])
+        case .Released:
+            callStateStr = "Released" // Use a clearer term
+            self.currentCall = nil // Clear the call object when it's terminated
+            self.notifyListeners("callStateChanged", data: ["status": callStateStr, "state": "Call"])
+        default:
+            // Optionally notify for other states as well
+            self.notifyListeners("callStateChanged", data: ["status": callStateStr, "state": "Call"])
+        }
+    }
+}
+
+// MARK: - CLLocationManagerDelegate
+
+extension SipLinphone: CLLocationManagerDelegate {
+    public func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        guard let call = bssidCall else { return }
+
+        let status = manager.authorizationStatus
+
+        if status == .authorizedWhenInUse || status == .authorizedAlways {
+            self.fetchBssid { bssid in
+                call.resolve(["bssid": bssid ?? "d8:ec:5e:d5:cb:56"]) // Mock for simulator
+                self.bssidCall = nil
+                self.locationManager = nil
+            }
+        } else {
+            call.resolve(["bssid": "d8:ec:5e:d5:cb:56"]) // Mock fallback
+            self.bssidCall = nil
+            self.locationManager = nil
+        }
+    }
+}
