@@ -5,10 +5,12 @@ import Capacitor
 public class SipLinphonePlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "SipLinphonePlugin"
     public let jsName = "SipLinphone"
+    private let implementation = SipLinphone()
 
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "initialize", returnType: "promise"),
         CAPPluginMethod(name: "register", returnType: "promise"),
+        CAPPluginMethod(name: "unregister", returnType: "promise"),
         CAPPluginMethod(name: "makeCall", returnType: "promise"),
         CAPPluginMethod(name: "terminateCall", returnType: "promise"),
         CAPPluginMethod(name: "setMute", returnType: "promise"),
@@ -19,7 +21,28 @@ public class SipLinphonePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "getCurrentBssid", returnType: "promise")
     ]
 
-    private let implementation = SipLinphone()
+    // This method is called when the plugin is first initialized.
+    public override func load() {
+        super.load()
+        self.setupEventListeners()
+    }
+
+    // Set up the closures to listen for events from the implementation class.
+    private func setupEventListeners() {
+        implementation.onRegistrationStateChanged = { [weak self] data in
+            self?.notifyListeners("registrationStateChanged", data: data)
+        }
+
+        implementation.onIncomingCall = { [weak self] data in
+            self?.notifyListeners("incomingCall", data: data)
+        }
+
+        implementation.onCallStateChanged = { [weak self] data in
+            self?.notifyListeners("callStateChanged", data: data)
+        }
+    }
+
+    // MARK: - Bridged Plugin Methods
 
     @objc func initialize(_ call: CAPPluginCall) {
         implementation.initialize(call)
@@ -27,6 +50,10 @@ public class SipLinphonePlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func register(_ call: CAPPluginCall) {
         implementation.register(call)
+    }
+
+    @objc func unregister(_ call: CAPPluginCall) {
+        implementation.unregister(call)
     }
 
     @objc func makeCall(_ call: CAPPluginCall) {

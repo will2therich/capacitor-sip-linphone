@@ -152,7 +152,7 @@ public class SipLinphonePlugin extends Plugin {
         }
 
         try {
-            Address address = linphoneCore.interpretUrl(addressString);
+            Address address = linphoneCore.interpretUrl("sip:" + addressString);
             if (address == null) {
                 call.reject("Invalid SIP address.");
                 return;
@@ -160,7 +160,7 @@ public class SipLinphonePlugin extends Plugin {
 
             CallParams params = linphoneCore.createCallParams(null);
             if (params != null) {
-                linphoneCore.inviteAddressWithParams(address, params);
+                linphoneCore.inviteAddressWithParams("sip:" + address, params);
                 call.resolve();
             } else {
                 call.reject("Failed to create call parameters.");
