@@ -2,17 +2,17 @@ import Capacitor
 import CoreLocation
 import Foundation
 import NetworkExtension
-import SystemConfiguration.CaptiveNetwork
 import linphonesw
 
-// Inherit from NSObject to conform to CLLocationManagerDelegate
+// Inherit from NSObject to conform to CLLocationManagerDelegate and expose methods to Objective-C
 public class SipLinphone: NSObject {
     // MARK: - Properties
     private var currentCall: Call?
-    private var locationManager: CLLocationManager?
-    private var bssidCall: CAPPluginCall?
     private var linphoneCore: Core?
     private var coreTimer: Timer?
+    
+    private var locationManager: CLLocationManager?
+    private var bssidCall: CAPPluginCall?
 
     // MARK: - Event Closures
     var onRegistrationStateChanged: (([String: Any]) -> Void)?
@@ -33,7 +33,12 @@ public class SipLinphone: NSObject {
     // MARK: - Core and Registration
     @objc func initialize(_ call: CAPPluginCall) {
         do {
-            linphoneCore = try Factory.Instance.createCore(configPath: nil, factoryConfigPath: nil, systemContext: nil)
+            let factory = Factory.Instance
+            
+            // Create the core with default configuration paths.
+            // We are no longer disabling sound resources here, to allow the default ringtone to load.
+            linphoneCore = try factory.createCore(configPath: nil, factoryConfigPath: nil, systemContext: nil)
+            
             linphoneCore?.addDelegate(delegate: self)
             try linphoneCore?.start()
 
@@ -115,7 +120,6 @@ public class SipLinphone: NSObject {
         }
         do {
             try currentCall.terminate()
-            self.currentCall = nil
             call.resolve()
         } catch {
             call.reject("Failed to terminate call: \(error.localizedDescription)")
@@ -127,11 +131,18 @@ public class SipLinphone: NSObject {
             call.reject("No incoming call to accept")
             return
         }
-        do {
-            try incomingCall.accept()
-            call.resolve()
-        } catch {
-            call.reject("Failed to accept call: \(error.localizedDescription)")
+        
+        // Stop the ringtone to begin audio resource cleanup.
+        linphoneCore?.stopRinging()
+        
+        // Introduce a small delay to prevent a race condition upon accepting the call.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            do {
+                try incomingCall.accept()
+                call.resolve()
+            } catch {
+                call.reject("Failed to accept call after delay: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -140,12 +151,20 @@ public class SipLinphone: NSObject {
             call.reject("No incoming call to decline")
             return
         }
-        do {
-            try incomingCall.decline(reason: Reason.Declined)
-            self.currentCall = nil
-            call.resolve()
-        } catch {
-            call.reject("Failed to decline call: \(error.localizedDescription)")
+        
+        // Stop the ringtone to begin the audio resource cleanup.
+        linphoneCore?.stopRinging()
+        
+        // Introduce a small, asynchronous delay before declining.
+        // This gives the mediastreamer thread time to fully destroy the ringtone's
+        // audio filter, preventing the race condition that was causing the crash.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            do {
+                try incomingCall.decline(reason: Reason.Declined)
+                call.resolve()
+            } catch {
+                call.reject("Failed to decline call after delay: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -183,29 +202,64 @@ public class SipLinphone: NSObject {
         locationManager = CLLocationManager()
         locationManager?.delegate = self
 
-        switch locationManager?.authorizationStatus ?? .notDetermined {
+        let status: CLAuthorizationStatus
+        if #available(iOS 14.0, *) {
+            status = locationManager?.authorizationStatus ?? .notDetermined
+        } else {
+            status = CLLocationManager.authorizationStatus()
+        }
+
+        switch status {
         case .authorizedWhenInUse, .authorizedAlways:
-            fetchBssid { bssid in
-                call.resolve(["bssid": bssid ?? "d8:ec:5e:d5:cb:56"])
-            }
+            fetchBssid(for: call)
         case .notDetermined:
-            bssidCall = call
+            self.bssidCall = call
             locationManager?.requestWhenInUseAuthorization()
-        default:
-            call.reject("Location permission not granted")
+        case .denied, .restricted:
+            call.reject("Location permission is required to access Wi-Fi information. Please enable it in Settings.")
+        @unknown default:
+            call.reject("Unknown location authorization status.")
         }
     }
 
-    private func fetchBssid(completion: @escaping (String?) -> Void) {
+    private func fetchBssid(for call: CAPPluginCall) {
         NEHotspotNetwork.fetchCurrent { network in
-            if let bssid = network?.bssid {
-                print("Fetched BSSID: \(bssid)")
-                completion(bssid)
-            } else {
-                print("Failed to fetch BSSID")
-                completion(nil)
+            guard let bssid = network?.bssid else {
+                let errorMessage = "Could not retrieve BSSID. Ensure the device is connected to a Wi-Fi network."
+                print("⚠️ [SIP-IMPL] \(errorMessage)")
+                call.reject(errorMessage)
+                return
             }
+            
+            print("✅ [SIP-IMPL] Fetched BSSID: \(bssid)")
+            call.resolve(["bssid": bssid])
         }
+    }
+    
+    // MARK: - Private Helpers
+    private func handleAuthorizationChange(for manager: CLLocationManager) {
+        guard let call = bssidCall else { return }
+
+        let status: CLAuthorizationStatus
+        if #available(iOS 14.0, *) {
+            status = manager.authorizationStatus
+        } else {
+            status = CLLocationManager.authorizationStatus()
+        }
+
+        switch status {
+        case .authorizedWhenInUse, .authorizedAlways:
+            fetchBssid(for: call)
+        case .denied, .restricted:
+            call.reject("Location permission was denied. Cannot fetch Wi-Fi information.")
+        case .notDetermined:
+            break
+        @unknown default:
+            call.reject("An unknown error occurred with location permissions.")
+        }
+        
+        self.bssidCall = nil
+        self.locationManager = nil
     }
 }
 
@@ -228,13 +282,24 @@ extension SipLinphone: CoreDelegate {
             switch state {
             case .IncomingReceived:
                 self.currentCall = call
-                let data: [String: Any] = ["status": "IncomingReceived", "incomingFrom": "1001", "state": "Call"]
+                
+                // The compiler error "Cannot call value of non-function type" indicates that `ring`
+                // is a property, not a method. We assign the path of the ringtone file to this
+                // property to start the ringing.
+                let ringtonePath = core.config?.getString(section: "sound", key: "ring", defaultString: nil)
+                core.ring = ringtonePath
+                
+                let remoteAddress = call.remoteAddress?.asString() ?? "Unknown"
+                let data: [String: Any] = ["status": "IncomingReceived", "incomingFrom": remoteAddress, "state": "Call"]
                 self.onCallStateChanged?(data)
             case .Connected:
                 let data: [String: Any] = ["status": callStateStr, "state": "Call"]
                 self.onCallStateChanged?(data)
             case .Released:
-                self.currentCall = nil
+                // This is the single, reliable place to clear the current call.
+                if self.currentCall?.remoteAddress?.asString() == call.remoteAddress?.asString() {
+                    self.currentCall = nil
+                }
                 let data: [String: Any] = ["status": "Released", "state": "Call"]
                 self.onCallStateChanged?(data)
             default:
@@ -247,19 +312,12 @@ extension SipLinphone: CoreDelegate {
 
 // MARK: - CLLocationManagerDelegate
 extension SipLinphone: CLLocationManagerDelegate {
+    public func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+        handleAuthorizationChange(for: manager)
+    }
+    
+    @available(iOS 14.0, *)
     public func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        guard let call = bssidCall else { return }
-
-        if manager.authorizationStatus == .authorizedWhenInUse || manager.authorizationStatus == .authorizedAlways {
-            self.fetchBssid { bssid in
-                call.resolve(["bssid": bssid ?? "d8:ec:5e:d5:cb:56"]) // Mock for simulator
-                self.bssidCall = nil
-                self.locationManager = nil
-            }
-        } else {
-            call.resolve(["bssid": "d8:ec:5e:d5:cb:56"]) // Mock fallback
-            self.bssidCall = nil
-            self.locationManager = nil
-        }
+        handleAuthorizationChange(for: manager)
     }
 }
