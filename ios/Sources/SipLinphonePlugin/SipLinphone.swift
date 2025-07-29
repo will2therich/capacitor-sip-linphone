@@ -199,6 +199,7 @@ public class SipLinphone: NSObject {
 
     // MARK: - Network Information
     @objc func getCurrentBssid(_ call: CAPPluginCall) {
+        // A location manager is created for each request and cleaned up upon completion.
         locationManager = CLLocationManager()
         locationManager?.delegate = self
 
@@ -211,21 +212,37 @@ public class SipLinphone: NSObject {
 
         switch status {
         case .authorizedWhenInUse, .authorizedAlways:
-            fetchBssid(for: call)
+            // Permission already granted, fetch BSSID and clean up when done.
+            fetchBssid(for: call) { [weak self] in
+                self?.locationManager = nil
+            }
         case .notDetermined:
+            // Permission not yet requested. Store the call and request permission.
+            // The delegate will handle the result.
             self.bssidCall = call
             locationManager?.requestWhenInUseAuthorization()
         case .denied, .restricted:
             call.reject("Location permission is required to access Wi-Fi information. Please enable it in Settings.")
+            self.locationManager = nil // Clean up manager instance.
         @unknown default:
             call.reject("Unknown location authorization status.")
+            self.locationManager = nil // Clean up manager instance.
         }
     }
 
-    private func fetchBssid(for call: CAPPluginCall) {
+    /// Fetches the BSSID and executes a completion handler for cleanup.
+    private func fetchBssid(for call: CAPPluginCall, completion: (() -> Void)? = nil) {
         NEHotspotNetwork.fetchCurrent { network in
+            defer {
+                // Ensure the completion handler is always called to clean up resources.
+                // Dispatch to the main thread for safety when modifying properties.
+                DispatchQueue.main.async {
+                    completion?()
+                }
+            }
+            
             guard let bssid = network?.bssid else {
-                let errorMessage = "Could not retrieve BSSID. Ensure the device is connected to a Wi-Fi network."
+                let errorMessage = "Could not retrieve BSSID. Ensure the device is connected to a Wi-Fi network and has Location Access enabled."
                 print("⚠️ [SIP-IMPL] \(errorMessage)")
                 call.reject(errorMessage)
                 return
@@ -236,8 +253,9 @@ public class SipLinphone: NSObject {
         }
     }
     
-    // MARK: - Private Helpers
+    /// Handles the result of the location permission request.
     private func handleAuthorizationChange(for manager: CLLocationManager) {
+        // Ensure there is a pending call to handle.
         guard let call = bssidCall else { return }
 
         let status: CLAuthorizationStatus
@@ -249,17 +267,24 @@ public class SipLinphone: NSObject {
 
         switch status {
         case .authorizedWhenInUse, .authorizedAlways:
-            fetchBssid(for: call)
+            // Permission was granted. Fetch the BSSID and clean up everything in the completion handler.
+            fetchBssid(for: call) { [weak self] in
+                self?.bssidCall = nil
+                self?.locationManager = nil
+            }
         case .denied, .restricted:
+            // Permission denied. Reject the call and clean up resources immediately.
             call.reject("Location permission was denied. Cannot fetch Wi-Fi information.")
+            self.bssidCall = nil
+            self.locationManager = nil
         case .notDetermined:
+            // The status is still undetermined, do nothing and wait for another change.
             break
         @unknown default:
             call.reject("An unknown error occurred with location permissions.")
+            self.bssidCall = nil
+            self.locationManager = nil
         }
-        
-        self.bssidCall = nil
-        self.locationManager = nil
     }
 }
 
@@ -312,10 +337,12 @@ extension SipLinphone: CoreDelegate {
 
 // MARK: - CLLocationManagerDelegate
 extension SipLinphone: CLLocationManagerDelegate {
+    // Legacy support for iOS < 14
     public func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
         handleAuthorizationChange(for: manager)
     }
     
+    // For iOS 14+
     @available(iOS 14.0, *)
     public func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         handleAuthorizationChange(for: manager)
